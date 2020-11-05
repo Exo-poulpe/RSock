@@ -1,24 +1,23 @@
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
+use std::process;
 use std::time::Duration;
+use std::ascii;
+use std::str;
+use std::env;
+use std::fs::File;
+use std::io::Write;
+
+
+use pnet::datalink::{self, NetworkInterface};
+use pnet::datalink::Channel::Ethernet;
+use pnet::packet::{Packet, MutablePacket};
+use pnet::packet::ethernet::{EthernetPacket, MutableEthernetPacket};
 
 fn is_open(host: &String, port: u32) -> bool {
     TcpStream::connect(&*format!("{}:{}", host, port)).is_ok()
 }
-
-// fn opened_ports(host: &String, start: i32, finish: i32) -> Vec<i32> {
-//     let mut open_ports: Vec<i32> = vec![];
-
-//     for port in start..finish {
-//         if !is_open(host, port) {
-//             continue;
-//         }
-//         open_ports.push(port)
-//     }
-
-//     open_ports
-// }
 
 fn async_scan(host: &String, start: u32, end: u32) -> Vec<u32> {
     let mut open_ports: Vec<u32> = vec![];
@@ -32,18 +31,96 @@ fn async_scan(host: &String, start: u32, end: u32) -> Vec<u32> {
     open_ports
 }
 
+
+fn save_packet_file(filename: &str) {
+    // Analyse packet return + detect service in packet
+    let mut file = std::fs::File::create(filename).unwrap();
+
+    let interface_name = "eth0";
+    let interface_names_match =
+        |iface: &NetworkInterface| iface.name == interface_name;
+
+    // Find the network interface with the provided name
+    let interfaces = datalink::interfaces();
+    let interface = interfaces.into_iter()
+                              .filter(interface_names_match)
+                              .next()
+                              .unwrap();
+
+    // Create a new channel, dealing with layer 2 packets
+    let (mut tx, mut rx) = match datalink::channel(&interface, Default::default()) {
+        Ok(Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unhandled channel type"),
+        Err(e) => panic!("An error occurred when creating the datalink channel: {}", e)
+    };
+
+
+
+    loop {
+        match rx.next() {
+            Ok(packet) => {
+
+                let payload_offset;
+                if interface.is_loopback() {
+                    // The pnet code for BPF loopback adds a zero'd out Ethernet header
+                    payload_offset = 14;
+                } else {
+                    // Maybe is TUN interface
+                    payload_offset = 0;
+                }
+                if packet.len() > payload_offset {
+                    let packet = EthernetPacket::new(packet).unwrap();
+
+                    // file.write(packet);
+                }
+                // Constructs a single packet, the same length as the the one received,
+                // using the provided closure. This allows the packet to be constructed
+                // directly in the write buffer, without copying. If copying is not a
+                // problem, you could also use send_to.
+                //
+                // The packet is sent once the closure has finished executing.
+                // tx.build_and_send(1, packet.packet().len(),
+                //     &mut |mut new_packet| {
+                //         let mut new_packet = MutableEthernetPacket::new(new_packet).unwrap();
+
+                //         // Create a clone of the original packet
+                //         new_packet.clone_from(&packet);
+
+                //         // Switch the source and destination
+                //         new_packet.set_source(packet.get_destination());
+                //         new_packet.set_destination(packet.get_source());
+                // });
+            },
+            Err(e) => {
+                // If an error occurs, we can handle it here
+                panic!("An error occurred while reading: {}", e);
+            }
+        }
+    }
+    
+            
+            
+            
+    
+}
+
+
 fn main() {
-    let mut host: String = "192.168.1.1".to_string();
-    let mut ports: Vec<Vec<u32>> = Vec::new();
+    let host: String = "192.168.1.1".to_string();
+    // let ports: Vec<Vec<u32>> = Vec::new();
     let mut start_port: u32 = 1;
-    let mut end_port: u32 = 65535; // max 65535
-    let mut thread: u32 = 8;
-    let mut count_thread: u32 = 0;
-    let DEBUG = false;
+    let end_port: u32 = 65535; // max 65535
+    let thread: u32 = 32;
+    let debug = false;
 
     let step = end_port / thread;
     let (tx, rx) = mpsc::channel();
     let (tx2, rx2) = mpsc::channel();
+
+
+    thread::spawn(move || {
+        save_packet_file("pack.txt");
+    });
 
     for i in 0..thread {
             let host = host.clone();
@@ -51,7 +128,7 @@ fn main() {
             let tx2 = tx2.clone();
 
             thread::spawn(move || {
-                if (DEBUG)
+                if debug
                 {
                     println!("Thread[{}] : start : {} end : {}\n",i,&start_port,&step);
                 }
@@ -75,7 +152,7 @@ fn main() {
 
     for rec2 in rx2 {
         tot += rec2;
-        if DEBUG 
+        if debug 
         {
             println!("tot {}\n",&tot);
         }
@@ -86,24 +163,19 @@ fn main() {
     }
 }
 
-/*
-let conns = Arc::new( Mutex::new( vec![] ) );
-let thread_list = (0..thread).into_iter().map(|i| {
-        let host = host.clone();
-        let mut conns = conns.clone();
 
-        let handle = thread::spawn(move || {
-            println!("Start : {} \nStep : {} \nEnd : {} \nTherad num : {}",start_port,step,start_port + step,thread);
-            conns.lock().unwrap().push(async_scan(&host, start_port, start_port + step));
-        });
-        start_port += step;
+// let mut cap = Capture::from_device("eth0").unwrap()
+    //                   .promisc(true)
+    //                   .open().unwrap();
+    // while let Ok(packet) = &cap.next() {
 
-        handle
-    }).collect::<Vec<thread::JoinHandle<_>>>();
-
-    for thr in thread_list {
-        thr.join().unwrap();
-    }
-    let mut ports = conns.lock().unwrap();
-    print_ports(&ports);
-    */
+    //     is_open(&host, port);
+    //     println!("{:?}\n",packet.data);
+    //     for c in packet.data {
+    //         print!("{}",*c as char);
+    //     }
+    //     println!("\n");
+        
+    //     // println!("received packet! {:?}", c);
+    //     // process::exit(1);
+    // }
