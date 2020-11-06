@@ -1,0 +1,15 @@
+[package]
+name = "RSocklib"
+version = "0.1.0"
+authors = ["Exo-poulpe"]
+edition = "2018"
+
+[profile.dev]
+opt-level = 1
+
+[dependencies]
+pnet = "0.25.0"
+
+[RSocklib]
+name = "RSocklib"
+path = "src/RSocklib/src/lib.rs"
