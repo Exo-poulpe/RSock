@@ -52,8 +52,10 @@ fn main() {
     let mut start_port: u32 = 1;
     let end_port: u32 = 65535; // max 65535
     let thread: u32 = 32;
-    let debug = false;
+    let debug = true;
+    let mut ports : Vec<u32> = Vec::new();
 
-    RSocklib::port_scanner(&host,&thread,&start_port,&end_port,&debug);
-
+    RSocklib::port_scanner(&host,&thread,&start_port,&end_port,&mut ports,&debug);
+    
+    println!("{:?}",ports);
 }

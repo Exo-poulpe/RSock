@@ -93,7 +93,8 @@ fn save_packet_file(filename: &str) {
 }
 
 
-pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,debug:&bool)
+// Opti code and return vector
+pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,result : &mut Vec<u32>,debug:&bool) -> Vec<u32>
 {
     
     // let h = &host.clone();
@@ -108,17 +109,19 @@ pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,d
     // let e_port= end_port;
     // let step  = e_port  - s_port;
     // let debug = debug.clone();
-    let connections = Mutex::new(Vec::new());
     let mut tot : u32 = 0;
     let (tx,rx) = mpsc::channel();
     let (tx2,rx2) = mpsc::channel();
     let mut st_port = start_port.clone();
+    let mut result : Vec<u32> = Vec::new();
     
+
+    let connections = Arc::new( Mutex::new( Vec::new() ) );
     
     for i in 0..*thread {
         let host = host.clone();
         let tx = tx.clone();
-        let tx2 = tx2.clone();
+        let mut conn = connections.clone();
 
         thread::spawn(move || {
             if debug
@@ -129,23 +132,26 @@ pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,d
             for elem in vals
             {
                 tx.send(elem).unwrap();
+                conn.lock().unwrap().push(elem);
             }
-            tx2.send(1).unwrap();
+            tx.send(1).unwrap();
         });
         st_port += step;
+        tx2.send(1).unwrap();
     };
 
     
-
+    // let mut conn = connections.clone();
+    let mut res = result.clone();
     thread::spawn(move || {
         for received in rx {
-            connections.lock().unwrap().push(received);
-            if !debug {println!("Port : {}", received);}
+            res.push(received);
+            if debug {println!("Port : {}", received);}
         }
     });
 
-    for rec2 in rx2 {
-        tot += rec2;
+    for rec in rx2 {
+        tot += rec;
         if debug 
         {
             println!("tot {}\n",&tot);
@@ -157,5 +163,12 @@ pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,d
     }
 
     
-    
+
+    // for i in res {
+    //     result.push(i);
+    //     // println!("p result : {}",i);
+    // }
+
+    // result
+    res.clone()
 }
