@@ -1,28 +1,31 @@
-use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
+use pnet::datalink::Channel::Ethernet;
+use pnet::datalink::{self, NetworkInterface};
+use pnet::packet::ethernet::{EthernetPacket, MutableEthernetPacket};
+use pnet::packet::{MutablePacket, Packet};
+use std::process;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::process;
 use std::time::Duration;
-use pnet::datalink::{self, NetworkInterface};
-use pnet::datalink::Channel::Ethernet;
-use pnet::packet::{Packet, MutablePacket};
-use pnet::packet::ethernet::{EthernetPacket, MutableEthernetPacket};
+use std::net::{TcpStream};
 
 // Check if a port is open in a host return true or false
-pub fn is_open(host: &String, port: u32) -> bool {
+pub fn is_open(host: &String, port: u32) -> bool
+{
     TcpStream::connect(&*format!("{}:{}", host, port)).is_ok()
 }
 
-// Async scan scan range of port on host and return all port open 
-pub fn async_scan(host: &String, start: u32, end: u32) -> Vec<u32> {
-    let mut open_ports: Vec<u32> = vec![];
+// Async scan scan range of port on host and return all port open
+pub fn async_scan(host: &String, start: u32, end: u32) -> Vec<u32>
+{
+    let mut open_ports = Vec::new();
 
     for port in start..end {
-        if !is_open(host, port) {
-            continue;
+        if !is_open(host, port)
+                {
+                    continue;
+                }
+            open_ports.push(port)
         }
-        open_ports.push(port)
-    }
     open_ports
 }
 
@@ -32,27 +35,29 @@ fn save_packet_file(filename: &str) {
     let mut file = std::fs::File::create(filename).unwrap();
 
     let interface_name = "eth0";
-    let interface_names_match =
-        |iface: &NetworkInterface| iface.name == interface_name;
+    let interface_names_match = |iface: &NetworkInterface| iface.name == interface_name;
 
     // Find the network interface with the provided name
     let interfaces = datalink::interfaces();
-    let interface = interfaces.into_iter()
-                              .filter(interface_names_match)
-                              .next()
-                              .unwrap();
+    let interface = interfaces
+        .into_iter()
+        .filter(interface_names_match)
+        .next()
+        .unwrap();
 
     // Create a new channel, dealing with layer 2 packets
     let (mut tx, mut rx) = match datalink::channel(&interface, Default::default()) {
         Ok(Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unhandled channel type"),
-        Err(e) => panic!("An error occurred when creating the datalink channel: {}", e)
+        Err(e) => panic!(
+            "An error occurred when creating the datalink channel: {}",
+            e
+        ),
     };
 
     loop {
         match rx.next() {
             Ok(packet) => {
-
                 let payload_offset;
                 if interface.is_loopback() {
                     // The pnet code for BPF loopback adds a zero'd out Ethernet header
@@ -83,92 +88,57 @@ fn save_packet_file(filename: &str) {
                 //         new_packet.set_source(packet.get_destination());
                 //         new_packet.set_destination(packet.get_source());
                 // });
-            },
+            }
             Err(e) => {
                 // If an error occurs, we can handle it here
                 panic!("An error occurred while reading: {}", e);
             }
         }
-    }   
+    }
 }
 
-
-// Opti code and return vector
-pub fn port_scanner<'a>(host:&String,thread:&u32,start_port:&u32,end_port:&u32,result : &mut Vec<u32>,debug:&bool) -> Vec<u32>
-{
-    
-    // let h = &host.clone();
-    // let thr = &thread.clone();
-    // let mut s_port = start_port.clone();
-    // let e_port= &end_port.clone();
-    let step  = end_port / thread;
-    let debug = *debug;
-    // let h = host;
-    // let thr = thread;
-    // let mut s_port = start_port;
-    // let e_port= end_port;
-    // let step  = e_port  - s_port;
-    // let debug = debug.clone();
-    let mut tot : u32 = 0;
-    let (tx,rx) = mpsc::channel();
-    let (tx2,rx2) = mpsc::channel();
+// Port scanner and send by channel list of port
+fn port_scanner<'a>(
+    host: &String,
+    thread: &u32,
+    start_port: &u32,
+    end_port: &u32,
+    tx : mpsc::Sender<Vec<u32>>,
+    verbose: &bool,
+){
+    let step = end_port / thread;
+    let verbose = *verbose;
+    let mut tot: u32 = 0;
     let mut st_port = start_port.clone();
-    let mut result : Vec<u32> = Vec::new();
-    
 
-    let connections = Arc::new( Mutex::new( Vec::new() ) );
-    
     for i in 0..*thread {
         let host = host.clone();
+        let verbose = verbose.clone();
+        let start_p = st_port.clone();
         let tx = tx.clone();
-        let mut conn = connections.clone();
-
-        thread::spawn(move || {
-            if debug
-            {
-                println!("Thread[{}] : start : {} end : {}\n",i,&st_port,&step);
+        thread::spawn(move|| {
+            if verbose {
+                println!("Thread[{}] : start : {} end : {}\n", i, &start_p, &step);
             }
-            let vals = async_scan(&host, st_port, st_port + step);
-            for elem in vals
-            {
-                tx.send(elem).unwrap();
-                conn.lock().unwrap().push(elem);
-            }
-            tx.send(1).unwrap();
+            tx.send(async_scan(&host, start_p, start_p + step));
         });
         st_port += step;
-        tx2.send(1).unwrap();
-    };
-
-    
-    // let mut conn = connections.clone();
-    let mut res = result.clone();
-    thread::spawn(move || {
-        for received in rx {
-            res.push(received);
-            if debug {println!("Port : {}", received);}
-        }
-    });
-
-    for rec in rx2 {
-        tot += rec;
-        if debug 
-        {
-            println!("tot {}\n",&tot);
-        }
-        if tot == *thread
-        {   
-            break;
-        }
     }
+}
 
-    
-
-    // for i in res {
-    //     result.push(i);
-    //     // println!("p result : {}",i);
-    // }
-
-    // result
-    res.clone()
+// Start port scan and listen the list returned by the port_scanner
+pub fn port_discover<'a>(
+    host: &String,
+    thread: &u32,
+    start_port: &u32,
+    end_port: &u32,
+    verbose: &bool,
+) -> Vec<u32> {
+    let (tx,rx) = mpsc::channel();
+    let mut result : Vec<u32> = Vec::new();
+    port_scanner(&host, &thread, &start_port, &end_port, tx, &verbose);
+    for rec_v in rx {
+        result.extend(rec_v);
+    }
+    result
 }

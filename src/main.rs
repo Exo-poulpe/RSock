@@ -23,13 +23,23 @@ fn options<'a>() -> clap::App<'a, 'a> {
                                 .long("target")
                                 .required(false)
                                 .takes_value(true)
-                                .help("Set hashes to test (file or string)"))
+                                .help("Set the IP to use"))
                             .arg(Arg::with_name("PORT")
                                 .long("port")
                                 .short("p")
                                 .required(false)
                                 .takes_value(true)
-                                .help("Check if hash is valid"))
+                                .help("Set the port to use"))
+                            .arg(Arg::with_name("PORTSCAN")
+                                .long("port-scan")
+                                .required(false)
+                                .takes_value(false)
+                                .help("Make port scan on target"))
+                            .arg(Arg::with_name("THREADS")
+                                .long("thread")
+                                .required(false)
+                                .takes_value(true)
+                                .help("Number of thread"))
                             .arg(Arg::with_name("VERBOSE")
                                 .short("v")
                                 .long("verbose")
@@ -48,14 +58,32 @@ fn main() {
     let mut app : clap::App = options();
     let matches = app.clone().get_matches();
 
-    let host = "192.168.1.1".to_string();
+    let mut host : String;
     let mut start_port: u32 = 1;
     let end_port: u32 = 65535; // max 65535
-    let thread: u32 = 32;
-    let debug = true;
-    let mut ports : Vec<u32> = Vec::new();
-
-    RSocklib::port_scanner(&host,&thread,&start_port,&end_port,&mut ports,&debug);
+    let mut thread: u32;
+    let mut debug = false;
     
-    println!("{:?}",ports);
+    if matches.is_present("PORTSCAN") && matches.is_present("TARGET") && !matches.is_present("HELP") {
+        
+        if matches.is_present("THREADS"){
+            thread = matches.value_of("THREADS").expect("Fail to get value of target").parse::<u32>().expect("Fail to parse thread value");
+        } else{
+            thread = 4;
+        }
+        host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
+
+        println!("Scan start at : {} number of threads : {}\n",&host,&thread);
+        let result = RSocklib::port_discover(&host,&thread,&start_port,&end_port,&debug);
+        
+        for port in result {
+            println!("Port : {}",port);
+        }
+        std::process::exit(0);
+    }
+    else
+    {
+        app.print_help();
+        println!("\n");
+    }
 }
