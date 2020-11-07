@@ -74,7 +74,7 @@ fn main() {
     let mut start_port: u32 = 1;
     let end_port: u32 = 65535; // max 65535
     let mut thread: u32;
-    let mut verbose = matches.is_present("PORTSCAN");
+    let mut verbose = matches.is_present("VERBOSE");
     
     if matches.is_present("PORTSCAN") && matches.is_present("TARGET") && !matches.is_present("HELP") {
         

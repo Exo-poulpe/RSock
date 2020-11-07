@@ -11,5 +11,4 @@ opt-level = 0
 
 [dependencies]
 clap = "2.33.3"
-pnet = "0.25.0"
 RSocklib = {path = "./RSocklib" }
