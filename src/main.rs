@@ -1,3 +1,4 @@
+#![crate_type = "bin"]
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -6,8 +7,7 @@ use std::time::Duration;
 use std::ascii;
 use std::str;
 use std::env;
-use std::fs::File;
-use std::io::Write;
+use std::time::SystemTime;
 
 use clap::{App,Arg};
 use RSocklib;
@@ -39,12 +39,16 @@ fn options<'a>() -> clap::App<'a, 'a> {
                                 .long("thread")
                                 .required(false)
                                 .takes_value(true)
-                                .help("Number of thread"))
+                                .help("Set number of thread"))
                             .arg(Arg::with_name("VERBOSE")
                                 .short("v")
                                 .long("verbose")
                                 .required(false)
-                                .help("More verbose output (slower)"))                             
+                                .help("More verbose output (slower)"))      
+                            .arg(Arg::with_name("TIME")
+                                .long("time")
+                                .required(false)
+                                .help("print time elapsed"))                       
                             .arg(Arg::with_name("HELP")
                                 .short("h")
                                 .long("help")
@@ -55,6 +59,9 @@ fn options<'a>() -> clap::App<'a, 'a> {
 }
 
 fn main() {
+    const default_thread_value : u32 = 8;
+    const default_seconds_divisor : f64 = 1_000.;
+
     let mut app : clap::App = options();
     let matches = app.clone().get_matches();
 
@@ -69,15 +76,46 @@ fn main() {
         if matches.is_present("THREADS"){
             thread = matches.value_of("THREADS").expect("Fail to get value of target").parse::<u32>().expect("Fail to parse thread value");
         } else{
-            thread = 4;
+            thread = default_thread_value;
         }
-        host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
 
-        println!("Scan start at : {} number of threads : {}\n",&host,&thread);
+        host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
+        let start = SystemTime::now();
+        println!("Scan start for IP : {} number of threads : {}\n",&host,&thread);
         let result = RSocklib::port_discover(&host,&thread,&start_port,&end_port,&debug);
         
         for port in result {
             println!("Port : {}",port);
+        }
+
+        let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64 / default_seconds_divisor as f64;
+        if matches.is_present("TIME")
+        {
+            println!("\nTime elapsed : {} seconds",diff);
+        }
+        std::process::exit(0);
+    } else if matches.is_present("PORT") && matches.is_present("TARGET") && !matches.is_present("HELP") {
+
+        if matches.is_present("THREADS"){
+            thread = matches.value_of("THREADS").expect("Fail to get value of target").parse::<u32>().expect("Fail to parse thread value");
+        } else{
+            thread = default_thread_value;
+        }
+        
+        host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
+        start_port = matches.value_of("PORT").expect("Fail to get value of target").parse::<u32>().expect("Fail to parse port");
+
+        let start = SystemTime::now();
+
+        println!("Scan start for IP : {}:{}\n",&host,&start_port);
+        let result = RSocklib::is_open(&host,start_port);
+        
+        println!("The port : {} is {}",&start_port,if result { "open" } else { "close" });
+
+        let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64;
+        if matches.is_present("TIME")
+        {
+            println!("\nTime elapsed : {} seconds",diff);
         }
         std::process::exit(0);
     }
