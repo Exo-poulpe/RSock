@@ -35,6 +35,11 @@ fn options<'a>() -> clap::App<'a, 'a> {
                                 .required(false)
                                 .takes_value(false)
                                 .help("Make port scan on target"))
+                            .arg(Arg::with_name("CIDR")
+                                .long("cidr")
+                                .required(false)
+                                .takes_value(true)
+                                .help("Get CIDR for IP")) 
                             .arg(Arg::with_name("THREADS")
                                 .long("thread")
                                 .required(false)
@@ -118,6 +123,22 @@ fn main() {
             println!("\nTime elapsed : {} seconds",diff);
         }
         std::process::exit(0);
+    } else if matches.is_present("CIDR") && matches.is_present("TARGET") && !matches.is_present("HELP")
+    {
+        let host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
+        let cidr = matches.value_of("CIDR").expect("Fail to get value of CIDR").parse::<u8>().unwrap();
+
+        let mask = RSocklib::calc_cidr(&host,&cidr,&debug);
+        let wildcard = RSocklib::wildcard_mask(&cidr);
+
+        if matches.is_present("VERBOSE") {
+            println!("Mask of network {}",mask);
+            println!("Wild Mask of network {}",&wildcard);
+            println!("Value wildcard : {}",RSocklib::binary_ip_to_value(&wildcard));
+            let start = mask.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
+            let end = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
+            println!("Port scan start at {} and stop at {}",start,end);
+        }
     }
     else
     {

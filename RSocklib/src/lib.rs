@@ -1,7 +1,3 @@
-use pnet::datalink::Channel::Ethernet;
-use pnet::datalink::{self, NetworkInterface};
-use pnet::packet::ethernet::{EthernetPacket, MutableEthernetPacket};
-use pnet::packet::{MutablePacket, Packet};
 use std::process;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -27,74 +23,6 @@ pub fn async_scan(host: &String, start: u32, end: u32) -> Vec<u32>
             open_ports.push(port)
         }
     open_ports
-}
-
-// Save packet capture to file (TODO)
-fn save_packet_file(filename: &str) {
-    // Analyse packet return + detect service in packet
-    let mut file = std::fs::File::create(filename).unwrap();
-
-    let interface_name = "eth0";
-    let interface_names_match = |iface: &NetworkInterface| iface.name == interface_name;
-
-    // Find the network interface with the provided name
-    let interfaces = datalink::interfaces();
-    let interface = interfaces
-        .into_iter()
-        .filter(interface_names_match)
-        .next()
-        .unwrap();
-
-    // Create a new channel, dealing with layer 2 packets
-    let (mut tx, mut rx) = match datalink::channel(&interface, Default::default()) {
-        Ok(Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unhandled channel type"),
-        Err(e) => panic!(
-            "An error occurred when creating the datalink channel: {}",
-            e
-        ),
-    };
-
-    loop {
-        match rx.next() {
-            Ok(packet) => {
-                let payload_offset;
-                if interface.is_loopback() {
-                    // The pnet code for BPF loopback adds a zero'd out Ethernet header
-                    payload_offset = 14;
-                } else {
-                    // Maybe is TUN interface
-                    payload_offset = 0;
-                }
-                if packet.len() > payload_offset {
-                    let packet = EthernetPacket::new(packet).unwrap();
-
-                    // file.write(packet);
-                }
-                // Constructs a single packet, the same length as the the one received,
-                // using the provided closure. This allows the packet to be constructed
-                // directly in the write buffer, without copying. If copying is not a
-                // problem, you could also use send_to.
-                //
-                // The packet is sent once the closure has finished executing.
-                // tx.build_and_send(1, packet.packet().len(),
-                //     &mut |mut new_packet| {
-                //         let mut new_packet = MutableEthernetPacket::new(new_packet).unwrap();
-
-                //         // Create a clone of the original packet
-                //         new_packet.clone_from(&packet);
-
-                //         // Switch the source and destination
-                //         new_packet.set_source(packet.get_destination());
-                //         new_packet.set_destination(packet.get_source());
-                // });
-            }
-            Err(e) => {
-                // If an error occurs, we can handle it here
-                panic!("An error occurred while reading: {}", e);
-            }
-        }
-    }
 }
 
 // Port scanner and send by channel list of port
@@ -140,5 +68,134 @@ pub fn port_discover<'a>(
     for rec_v in rx {
         result.extend(rec_v);
     }
+    result
+}
+
+// Calculate netmask from ip and CIDR
+pub fn calc_cidr(ip : &String,cidr : &u8,verbose : &bool) -> String {
+    let parsed_ip = &ip;
+
+    let mut mask = create_mask(&cidr,&verbose);
+
+    let v_ip = ip_to_vec(&ip);
+    let v_mask = ip_to_vec(&mask);
+
+    let mut v_id : Vec<u8> = Vec::new();
+
+    for i in 0..v_ip.len()
+    {
+        v_id.push(v_ip[i]&v_mask[i]);
+    }
+
+    vec_to_ip(&v_id)
+
+    
+}
+
+// Convert String ip to binary of ip
+pub fn binary_ip_to_value(ip:&String) -> String {
+    let v_ip = ip.split(".").collect::<Vec<&str>>();
+    let mut result = String::new();
+
+    // println!("v ip {:?}",v_ip);
+    // println!("ip {}",ip);
+    for i in 0..v_ip.len() {
+        result += &format!("{}",u8::from_str_radix(&v_ip[i].to_string(), 2).unwrap());
+        if i != v_ip.len() - 1 {
+            result += ".";
+        }
+    }
+    result
+}
+
+// Calculate the wildcard mask
+pub fn wildcard_mask(cidr:&u8) -> String{
+    let mask = create_mask(&cidr,&true);
+    let mut wild = String::new();
+    let v_mask = ip_to_vec(&mask);
+    let mut result = String::new();
+    
+    for i in v_mask {
+        let tmp : &str = &format!("{:08b}",i);
+        wild += tmp;
+    }
+
+    for (i, c) in wild.chars().enumerate() { 
+        if i % 8 == 0 && i > 0 {
+            result += ".";
+        }
+        if c == '0' {
+            result += "1";
+        }else{
+            result += "0";
+        }
+    }
+    result
+}
+
+// Convert vector to string ip
+fn vec_to_ip(ip:&Vec<u8>) -> String 
+{
+    let mut s_ip : String = String::new();
+    for i in 0..ip.len() {
+        s_ip += &format!("{}",ip[i]);
+        if i != ip.len() - 1{
+            s_ip += ".";
+        }
+    }
+    s_ip
+}
+
+// Convert ip to vector of u8
+fn ip_to_vec(ip:&String) -> Vec<u8> {
+    let mut result : Vec<u8> = Vec::new();
+    let tmp = ip.split(".").collect::<Vec<&str>>();
+
+    // println!("{:?}",tmp);
+    for i in 0..4{
+        result.push(tmp[i].parse::<u8>().unwrap());
+    }
+    result
+}
+
+// Create net mask from CIDR
+fn create_mask(cidr : &u8,verbose : &bool) -> String {
+    let mut tmp = String::new();
+    const one : u32 = 1;
+    const zero : u32 = 0;
+    let mut v_mask : Vec<u8> = Vec::new();
+    let mut result : String = String::new();
+
+    for i in 0..32  {
+        if i < *cidr {
+            tmp += &one.to_string();
+        }else
+        {
+            tmp += &zero.to_string();
+        }
+    }
+
+    if *verbose 
+    {
+        println!("{}",tmp);
+    }
+
+    for i in 0..4{
+        v_mask.push(u8::from_str_radix(&tmp[i * 8..8 * (i + 1)], 2).unwrap());
+    }
+
+    if *verbose 
+    {
+        println!("{:?}",v_mask);
+    }
+
+    for i in 0..v_mask.len() {
+        result += &v_mask[i].to_string();
+        if i != v_mask.len() - 1 {
+            result += ".";
+        }
+
+    }
+    println!("{}",result);
     result
 }
