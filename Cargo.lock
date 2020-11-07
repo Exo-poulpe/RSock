@@ -12,9 +12,6 @@ dependencies = [
 [[package]]
 name = "RSocklib"
 version = "0.1.0"
-dependencies = [
- "pnet",
-]
 
 [[package]]
 name = "aho-corasick"

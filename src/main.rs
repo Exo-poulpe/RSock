@@ -74,7 +74,7 @@ fn main() {
     let mut start_port: u32 = 1;
     let end_port: u32 = 65535; // max 65535
     let mut thread: u32;
-    let mut debug = false;
+    let mut verbose = matches.is_present("PORTSCAN");
     
     if matches.is_present("PORTSCAN") && matches.is_present("TARGET") && !matches.is_present("HELP") {
         
@@ -87,7 +87,7 @@ fn main() {
         host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
         let start = SystemTime::now();
         println!("Scan start for IP : {} number of threads : {}\n",&host,&thread);
-        let result = RSocklib::port_discover(&host,&thread,&start_port,&end_port,&debug);
+        let result = RSocklib::port_discover(&host,&thread,&start_port,&end_port,&verbose);
         
         for port in result {
             println!("Port : {}",port);
@@ -128,13 +128,13 @@ fn main() {
         let host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
         let cidr = matches.value_of("CIDR").expect("Fail to get value of CIDR").parse::<u8>().unwrap();
 
-        let mask = RSocklib::calc_cidr(&host,&cidr,&debug);
-        let wildcard = RSocklib::wildcard_mask(&cidr);
+        let mask = RSocklib::calc_cidr(&host,&cidr,&verbose);
+        let wildcard = RSocklib::wildcard_mask(&cidr,&verbose);
+        println!("Mask of network {}",mask);
+        println!("Wild Mask of network {}",&wildcard);
+        println!("Wildcard mask : {}",RSocklib::binary_ip_to_value(&wildcard));
 
         if matches.is_present("VERBOSE") {
-            println!("Mask of network {}",mask);
-            println!("Wild Mask of network {}",&wildcard);
-            println!("Value wildcard : {}",RSocklib::binary_ip_to_value(&wildcard));
             let start = mask.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
             let end = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
             println!("Port scan start at {} and stop at {}",start,end);

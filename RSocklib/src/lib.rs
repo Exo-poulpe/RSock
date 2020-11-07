@@ -97,8 +97,6 @@ pub fn binary_ip_to_value(ip:&String) -> String {
     let v_ip = ip.split(".").collect::<Vec<&str>>();
     let mut result = String::new();
 
-    // println!("v ip {:?}",v_ip);
-    // println!("ip {}",ip);
     for i in 0..v_ip.len() {
         result += &format!("{}",u8::from_str_radix(&v_ip[i].to_string(), 2).unwrap());
         if i != v_ip.len() - 1 {
@@ -109,8 +107,8 @@ pub fn binary_ip_to_value(ip:&String) -> String {
 }
 
 // Calculate the wildcard mask
-pub fn wildcard_mask(cidr:&u8) -> String{
-    let mask = create_mask(&cidr,&true);
+pub fn wildcard_mask(cidr:&u8,verbose : &bool) -> String{
+    let mask = create_mask(&cidr,&verbose);
     let mut wild = String::new();
     let v_mask = ip_to_vec(&mask);
     let mut result = String::new();
@@ -177,7 +175,7 @@ fn create_mask(cidr : &u8,verbose : &bool) -> String {
 
     if *verbose 
     {
-        println!("{}",tmp);
+        println!("Mask tmp : {}",tmp);
     }
 
     for i in 0..4{
@@ -196,6 +194,5 @@ fn create_mask(cidr : &u8,verbose : &bool) -> String {
         }
 
     }
-    println!("{}",result);
     result
 }
