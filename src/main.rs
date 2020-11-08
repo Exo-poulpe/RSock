@@ -117,7 +117,7 @@ fn main() {
         
         println!("The port : {} is {}",&start_port,if result { "open" } else { "close" });
 
-        let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64;
+        let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64 / default_seconds_divisor as f64;
         if matches.is_present("TIME")
         {
             println!("\nTime elapsed : {} seconds",diff);
@@ -128,20 +128,30 @@ fn main() {
         let host = matches.value_of("TARGET").expect("Fail to get value of target").to_string();
         let cidr = matches.value_of("CIDR").expect("Fail to get value of CIDR").parse::<u8>().unwrap();
 
-        let mask = RSocklib::calc_cidr(&host,&cidr,&verbose);
+        let start = SystemTime::now();
+        let netid = RSocklib::calc_cidr(&host,&cidr,&verbose);
+        let mask = RSocklib::create_mask(&cidr,&verbose);
         let wildcard = RSocklib::wildcard_mask(&cidr,&verbose);
         let wildcard_value = RSocklib::binary_ip_to_value(&wildcard);
         println!("Mask of network {}",mask);
-        println!("Wild Mask of network {}",&wildcard);
-        println!("Wildcard mask : {}",wildcard_value);
+        println!("Network ID {}",netid);
+        println!("Wildcard mask in binary of network {} => {}",&wildcard,&wildcard_value);
 
-        if matches.is_present("VERBOSE") {
-            let start = mask.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
-            let end = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
-            println!("Port scan start at {} and stop at {}",start,end);
-            let range_ip = RSocklib::create_ip_range(&mask, &wildcard_value);
-            println!("{} / {}",range_ip.0,range_ip.1);
-            RSocklib::scan_ip_range(&range_ip.0, &range_ip.1);
+        let start_ip = netid.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
+        let end_ip = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
+        println!("Port scan start at {} and stop at {}",start_ip,end_ip);
+        let range_ip = RSocklib::create_ip_range(&netid, &wildcard_value);
+        println!("{} / {}",range_ip.0,range_ip.1);
+        
+        
+        let open_host = RSocklib::scan_ip_range(&range_ip.0, &range_ip.1,&verbose);
+        for elem in open_host {
+            println!("Host found : {}",elem);
+        }
+
+        if matches.is_present("TIME") {
+            let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64 / default_seconds_divisor as f64;
+            println!("\nTime elapsed : {:?} seconds",diff);
         }
     }
     else

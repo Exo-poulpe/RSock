@@ -5,6 +5,7 @@ use std::time::Duration;
 use std::net::{TcpStream};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::process::Command;
+use std::time;
 
 // Check if a port is open in a host return true or false
 pub fn is_open(host: &String, port: u32) -> bool
@@ -159,7 +160,7 @@ fn ip_to_vec(ip:&String) -> Vec<u8> {
 }
 
 // Create net mask from CIDR
-fn create_mask(cidr : &u8,verbose : &bool) -> String {
+pub fn create_mask(cidr : &u8,verbose : &bool) -> String {
     let mut tmp = String::new();
     const one : u32 = 1;
     const zero : u32 = 0;
@@ -217,19 +218,34 @@ pub fn create_ip_range(ip:&String,mask:&String) -> (String,String) {
     
 }
 
-pub fn scan_ip_range(start_ip : &String,end_ip : &String) -> Vec<String> {
+pub fn scan_ip_range(start_ip : &String,end_ip : &String,verbose : &bool) -> Vec<String> {
     
     let mut vec_ip = ip_to_vec(start_ip);
     let mut result : Vec<String> = Vec::new();
+    ping_addr(&vec_to_ip(&vec_ip),&end_ip,&verbose)
+}
+
+fn ping_addr(ip:&String,end_ip:&String,verbose:&bool) -> Vec<String>
+{
+    let (tx,rx) = mpsc::channel();
+    let mut count : u32 = 0;
+    let mut vec_ip = ip_to_vec(ip);
+    let mut result : Vec<String> = Vec::new();
 
     loop {
-        let tmp = ping_addr(&vec_to_ip(&vec_ip));
-        if tmp {
-            result.push(vec_to_ip(&vec_ip));
-        }
+        let tx = tx.clone();
+        let v_ip = vec_ip.clone();
+        let verbose = verbose.clone();
+        thread::spawn(move || {
+            ping(&vec_to_ip(&v_ip),tx,&verbose);
+        });
+
+        thread::sleep(time::Duration::from_millis(10));
+
         if vec_to_ip(&vec_ip) == *end_ip {
             break;
         }else{
+            count += 1;
             if vec_ip[3] == 255 {
                 vec_ip[3] = 1;
                 if vec_ip[2] == 255 {
@@ -243,10 +259,27 @@ pub fn scan_ip_range(start_ip : &String,end_ip : &String) -> Vec<String> {
             }
         }
     }
+
+    let mut l_cnt : u32 = 1;
+    for rec_v in rx {
+        if rec_v.1 == "true" {
+            result.push(format!("{} : {}",rec_v.0,rec_v.1));
+        }
+        if l_cnt >= count {
+            break;
+        }else{
+            l_cnt += 1;
+        }
+    }
+
+    if *verbose {
+        println!("Host scanned : {}",count);
+    }
+    
     result
 }
 
-fn ping_addr(ip:&String) -> bool {
+fn ping(ip:&String,tx : mpsc::Sender<(String,&str)>,verbose:&bool) {
     let ip_to_ping = ip.parse::<IpAddr>().unwrap();
     let mut command = String::new();
     let mut result : bool;
@@ -263,6 +296,7 @@ fn ping_addr(ip:&String) -> bool {
     let mut cmd = Command::new("ping");
     cmd.args(&args[..]);
     result = cmd.output().expect("Error ping").status.success();
-    println!("ip {} : {}",ip,result);
-    result
+    // println!("ip {} : {}",ip,result);
+    let mut sender = (ip.to_string(),if result {"true"} else {"false"});
+    tx.send(sender);
 }
