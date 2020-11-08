@@ -53,7 +53,7 @@ fn options<'a>() -> clap::App<'a, 'a> {
                             .arg(Arg::with_name("TIME")
                                 .long("time")
                                 .required(false)
-                                .help("print time elapsed"))                       
+                                .help("Print time elapsed"))                       
                             .arg(Arg::with_name("HELP")
                                 .short("h")
                                 .long("help")
