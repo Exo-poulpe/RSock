@@ -130,14 +130,18 @@ fn main() {
 
         let mask = RSocklib::calc_cidr(&host,&cidr,&verbose);
         let wildcard = RSocklib::wildcard_mask(&cidr,&verbose);
+        let wildcard_value = RSocklib::binary_ip_to_value(&wildcard);
         println!("Mask of network {}",mask);
         println!("Wild Mask of network {}",&wildcard);
-        println!("Wildcard mask : {}",RSocklib::binary_ip_to_value(&wildcard));
+        println!("Wildcard mask : {}",wildcard_value);
 
         if matches.is_present("VERBOSE") {
             let start = mask.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
             let end = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
             println!("Port scan start at {} and stop at {}",start,end);
+            let range_ip = RSocklib::create_ip_range(&mask, &wildcard_value);
+            println!("{} / {}",range_ip.0,range_ip.1);
+            RSocklib::scan_ip_range(&range_ip.0, &range_ip.1);
         }
     }
     else

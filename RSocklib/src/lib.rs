@@ -3,6 +3,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use std::net::{TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::process::Command;
 
 // Check if a port is open in a host return true or false
 pub fn is_open(host: &String, port: u32) -> bool
@@ -194,5 +196,73 @@ fn create_mask(cidr : &u8,verbose : &bool) -> String {
         }
 
     }
+    result
+}
+
+pub fn create_ip_range(ip:&String,mask:&String) -> (String,String) {
+
+    let mut v_ip = ip_to_vec(&ip);
+    let mut v_mask = ip_to_vec(&mask);
+    let mut v_result = Vec::new();
+
+    for i in 0..v_mask.len() {
+        if v_mask[i] == 0 {
+            v_result.push(v_ip[i]);
+        }else{
+            v_result.push(v_mask[i]);
+        }
+    }
+
+    (vec_to_ip(&v_ip),vec_to_ip(&v_result))
+    
+}
+
+pub fn scan_ip_range(start_ip : &String,end_ip : &String) -> Vec<String> {
+    
+    let mut vec_ip = ip_to_vec(start_ip);
+    let mut result : Vec<String> = Vec::new();
+
+    loop {
+        let tmp = ping_addr(&vec_to_ip(&vec_ip));
+        if tmp {
+            result.push(vec_to_ip(&vec_ip));
+        }
+        if vec_to_ip(&vec_ip) == *end_ip {
+            break;
+        }else{
+            if vec_ip[3] == 255 {
+                vec_ip[3] = 1;
+                if vec_ip[2] == 255 {
+                    vec_ip[2] = 1;
+                    vec_ip[1] += 1;
+                }else{
+                    vec_ip[2] += 1;
+                }
+            }else{
+                vec_ip[3] += 1;
+            }
+        }
+    }
+    result
+}
+
+fn ping_addr(ip:&String) -> bool {
+    let ip_to_ping = ip.parse::<IpAddr>().unwrap();
+    let mut command = String::new();
+    let mut result : bool;
+    let mut args = Vec::new();
+
+    if cfg!(unix) {
+        args.push("-c");
+    } else {
+        args.push("-n");
+    };
+    args.push("5");
+    args.push(ip);
+
+    let mut cmd = Command::new("ping");
+    cmd.args(&args[..]);
+    result = cmd.output().expect("Error ping").status.success();
+    println!("ip {} : {}",ip,result);
     result
 }
