@@ -14,7 +14,7 @@ use RSocklib;
 
 // OPTIONS parser
 fn options<'a>() -> clap::App<'a, 'a> {
-    let result = App::new("RustHash")
+    let result = App::new("RSock")
                             .version("0.0.1.0")
                             .author("Exo-poulpe")
                             .about("Rust Socket scan network")
