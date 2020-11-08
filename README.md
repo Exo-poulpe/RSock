@@ -11,12 +11,12 @@ Download the Rust source and compile then.
 ## Usage/Help ##
 
 ```
-RustHash 0.0.1.0
+RSock 0.0.1.0
 Exo-poulpe
 Rust Socket scan network
 
 USAGE:
-    RustHash [FLAGS] [OPTIONS]
+    RSock [FLAGS] [OPTIONS]
 
 FLAGS:
     -h, --help         Print this message
