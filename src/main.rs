@@ -15,7 +15,7 @@ use RSocklib;
 // OPTIONS parser
 fn options<'a>() -> clap::App<'a, 'a> {
     let result = App::new("RSock")
-                            .version("0.0.1.0")
+                            .version("0.0.1.1")
                             .author("Exo-poulpe")
                             .about("Rust Socket scan network")
                             .arg(Arg::with_name("TARGET")
