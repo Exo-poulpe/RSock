@@ -35,6 +35,11 @@ fn options<'a>() -> clap::App<'a, 'a> {
                                 .required(false)
                                 .takes_value(false)
                                 .help("Make port scan on target"))
+                            .arg(Arg::with_name("HOSTSCAN")
+                                .long("host-scan")
+                                .required(false)
+                                .takes_value(false)
+                                .help("Use target and cidr to scan host"))
                             .arg(Arg::with_name("CIDR")
                                 .long("cidr")
                                 .required(false)
@@ -137,16 +142,19 @@ fn main() {
         println!("Network ID {}",netid);
         println!("Wildcard mask in binary of network {} => {}",&wildcard,&wildcard_value);
 
-        let start_ip = netid.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
-        let end_ip = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
-        println!("Port scan start at {} and stop at {}",start_ip,end_ip);
-        let range_ip = RSocklib::create_ip_range(&netid, &wildcard_value);
-        println!("{} / {}",range_ip.0,range_ip.1);
-        
-        
-        let open_host = RSocklib::scan_ip_range(&range_ip.0, &range_ip.1,&verbose);
-        for elem in open_host {
-            println!("Host found : {}",elem);
+        if matches.is_present("HOSTSCAN")
+        {
+            let start_ip = netid.split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() + 1;
+            let end_ip = RSocklib::binary_ip_to_value(&wildcard).split(".").collect::<Vec<&str>>()[3].parse::<u8>().unwrap() - 1;
+            println!("Port scan start at {} and stop at {}",start_ip,end_ip);
+            let range_ip = RSocklib::create_ip_range(&netid, &wildcard_value);
+            println!("{} / {}",range_ip.0,range_ip.1);
+            
+            
+            let open_host = RSocklib::scan_ip_range(&range_ip.0, &range_ip.1,&verbose);
+            for elem in open_host {
+                println!("Host found : {}",elem);
+            }
         }
 
         if matches.is_present("TIME") {
