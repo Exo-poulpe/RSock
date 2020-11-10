@@ -15,7 +15,7 @@ use RSocklib;
 // OPTIONS parser
 fn options<'a>() -> clap::App<'a, 'a> {
     let result = App::new("RSock")
-                            .version("0.0.1.1")
+                            .version("0.0.1.2")
                             .author("Exo-poulpe")
                             .about("Rust Socket scan network")
                             .arg(Arg::with_name("TARGET")
@@ -95,7 +95,7 @@ fn main() {
         let result = RSocklib::port_discover(&host,&thread,&start_port,&end_port,&verbose);
         
         for port in result {
-            println!("Port : {}",port);
+            println!("Port : {}",RSocklib::print_port_default(&port));
         }
 
         let diff = start.elapsed().expect("Fail to get value of time").as_millis() as f64 / default_seconds_divisor as f64;

@@ -11,7 +11,7 @@ Download the Rust source and compile then.
 ## Usage/Help ##
 
 ```
-RSock 0.0.1.1
+RSock 0.0.1.2
 Exo-poulpe
 Rust Socket scan network
 
@@ -47,12 +47,12 @@ With this command you scan all port of the address 192.168.1.12 with 16 thread a
 Result :
 
 ```
-Port : 80
+Port : 80 (http ?)
 Port : 667
 
 Time elapsed : 18.45 seconds
 ```
-(print only opened port)
+(print only opened port with default port of protocol)
 
 ### Host ###
 

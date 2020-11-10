@@ -6,6 +6,22 @@ use std::net::{TcpStream};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::process::Command;
 use std::time;
+use std::collections::HashMap;
+
+
+
+pub fn print_port_default(port:&u32) -> String {
+    let default_port: HashMap<u32, &str> = 
+    [(21,"ftp" ), (22, "ssh ?"),(23,"telnet ?"), (53,"dns ?"),(80, "http ?"),(115,"sftp ?"),(443,"https ?"),(989,"ftps ?"),(992,"telnet ?")]
+    .iter().cloned().collect();
+    let mut result;
+    if default_port.contains_key(port) {
+        result = format!("{} ({})",&port,default_port.get(port).unwrap());
+    }else{
+        result = port.to_string();
+    }
+    result
+}
 
 // Check if a port is open in a host return true or false
 pub fn is_open(host: &String, port: u32) -> bool
